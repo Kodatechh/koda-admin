@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <meta name="theme-color" content="#f5f5f7" />
+<meta name="color-scheme" content="light" />
 <title>Koda Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,7 +12,25 @@
 <link rel="stylesheet" href="assets/styles.css" />
 </head>
 <body>
-<div class="app">
+<div class="auth-shell" id="authShell">
+  <div class="login-wrap">
+    <div class="login-brand"><div class="brandmark large">K</div><span>Koda</span></div>
+    <div class="login-card">
+      <div class="eyebrow">KODA ADMIN</div>
+      <h1>Bem-vindo.</h1>
+      <p>Entre com uma conta administrativa da Koda.</p>
+      <form id="loginForm" class="login-form">
+        <label>E-mail<input id="loginEmail" name="email" type="email" autocomplete="username" required placeholder="voce@koda.com" /></label>
+        <label>Senha<input id="loginPassword" name="password" type="password" autocomplete="current-password" required placeholder="••••••••" /></label>
+        <button class="primary login-submit" id="loginSubmit" type="submit">Entrar</button>
+        <div class="form-status" id="loginStatus" role="status" aria-live="polite"></div>
+      </form>
+    </div>
+    <p class="login-foot">Acesso restrito · Koda</p>
+  </div>
+</div>
+
+<div class="app" id="adminApp" hidden>
 <aside class="sidebar">
   <div class="brand"><div class="brandmark">K</div><div class="brandtext"><strong>Koda</strong><span>Admin</span></div></div>
   <nav id="nav">
@@ -22,27 +41,49 @@
     <button class="navbtn" data-page="customers"><span class="glyph">◎</span><span>Clientes</span></button>
     <button class="navbtn" data-page="products"><span class="glyph">◇</span><span>Produtos</span></button>
     <button class="navbtn" data-page="cloud"><span class="glyph">☁</span><span>KodaCloud</span></button>
-    <button class="navbtn" data-page="support"><span class="glyph">?</span><span>Suporte</span></button>
+    <button class="navbtn" data-page="support"><span class="glyph">?</span><span>Chamados</span></button>
     <button class="navbtn" data-page="audit"><span class="glyph">≡</span><span>Auditoria</span></button>
     <button class="navbtn" data-page="settings"><span class="glyph">⚙</span><span>Configurações</span></button>
   </nav>
-  <div class="spacer"></div><div class="sys"><strong><i class="dot"></i>Todos os sistemas</strong><span>Operando normalmente</span></div>
+  <div class="spacer"></div>
+  <div class="sys" id="systemStatus"><strong><i class="dot"></i>KodaCloud</strong><span>Conectando…</span></div>
 </aside>
 <main class="main">
-<header class="topbar"><div class="crumb" id="crumb">Visão geral</div><div class="actions"><button class="round" id="search">⌕</button><button class="round">·</button><div class="avatar">AM</div></div></header>
+<header class="topbar">
+  <div class="crumb" id="crumb">Visão geral</div>
+  <div class="actions">
+    <button class="top-action" id="refreshData" type="button">Atualizar</button>
+    <button class="round" id="search" type="button" aria-label="Busca">⌕</button>
+    <button class="avatar" id="accountButton" type="button" aria-label="Conta">K</button>
+    <div class="account-menu" id="accountMenu" hidden>
+      <strong id="accountName">Administrador</strong>
+      <span id="accountEmail"></span>
+      <button id="logoutButton" type="button">Sair</button>
+    </div>
+  </div>
+</header>
 <section class="page active" id="page-dashboard">
-<div class="hero"><div><div class="eyebrow">KODA ADMIN · 16 DE AGOSTO</div><h1>Bom dia, Arthur.</h1><p>Uma visão limpa do ecossistema Koda — dispositivos, software, vendas e operação em um só lugar.</p></div><button class="primary" id="quickOpen">+ Ação rápida</button></div>
-<div class="hero-grid">
-  <article class="feature"><small>FROTA KODA</small><div class="big">127</div><h2>119 online agora.</h2><p>A maior parte da frota está conectada e saudável. Oito dispositivos estão offline e três aguardam ativação.</p></article>
-  <div class="stack"><article class="tile"><div class="tile-head"><span>KODA OS 1.4.1</span><span>Estável</span></div><strong>96%</strong><div class="sub">122 de 127 dispositivos atualizados</div><div class="progress"><i style="width:96%"></i></div></article><article class="tile"><div class="tile-head"><span>Pedidos hoje</span><span>+16,7%</span></div><strong>14</strong><div class="sub">R$ 3.842 em receita confirmada</div></article></div>
-</div>
-<div class="section-head"><div><h2>Hoje na Koda</h2><p>Os números que merecem sua atenção.</p></div><button class="linkbtn" data-goto="devices">Ver dispositivos →</button></div>
-<div class="cards3"><article class="card"><div class="label">Aguardando ativação</div><div class="value">3</div><div class="meta">2 fabricados hoje</div></article><article class="card"><div class="label">KodaCloud</div><div class="value">99,99%</div><div class="meta">Disponibilidade nas últimas 24 h</div></article><article class="card"><div class="label">Suporte</div><div class="value">3</div><div class="meta">Chamados aguardando resposta</div></article></div>
-<div class="section-head"><div><h2>Atividade recente</h2><p>Últimos eventos importantes do ecossistema.</p></div><button class="linkbtn" data-goto="audit">Ver tudo →</button></div>
-<div class="activity"><div class="activity-row"><div class="acticon">✓</div><div><strong>KodaBot KB1-BR-000184 ativado</strong><span>Novo dispositivo vinculado à Conta Koda</span></div><span>8 min</span></div><div class="activity-row"><div class="acticon">↗</div><div><strong>Pedido #1048 enviado</strong><span>Rastreio adicionado ao pedido</span></div><span>21 min</span></div><div class="activity-row"><div class="acticon">↻</div><div><strong>KODA OS 1.4.1 publicado</strong><span>Canal estável · rollout global</span></div><span>43 min</span></div></div>
+  <div class="loading-state">Carregando dados reais do KodaCloud…</div>
 </section>
-<section class="page" id="page-devices"></section><section class="page" id="page-os"></section><section class="page" id="page-orders"></section><section class="page" id="page-customers"></section><section class="page" id="page-products"></section><section class="page" id="page-cloud"></section><section class="page" id="page-support"></section><section class="page" id="page-audit"></section><section class="page" id="page-settings"></section>
-</main></div>
-<div class="modal" id="modal" hidden><div class="dialog"><button class="round" id="close" style="float:right">×</button><h3>Ação rápida</h3><p>Comece uma tarefa sem sair do painel.</p><div class="quick"><button data-goto="devices"><strong>Cadastrar KodaBot</strong><span>Serial, modelo e estado inicial</span></button><button data-goto="os"><strong>Publicar KODA OS</strong><span>Preparar novo rollout</span></button><button data-goto="orders"><strong>Novo pedido</strong><span>Criar pedido manualmente</span></button><button data-goto="customers"><strong>Novo cliente</strong><span>Criar Conta Koda</span></button></div></div></div>
-<script src="assets/app.js"></script>
-</body></html>
+<section class="page" id="page-devices"></section>
+<section class="page" id="page-os"></section>
+<section class="page" id="page-orders"></section>
+<section class="page" id="page-customers"></section>
+<section class="page" id="page-products"></section>
+<section class="page" id="page-cloud"></section>
+<section class="page" id="page-support"></section>
+<section class="page" id="page-audit"></section>
+<section class="page" id="page-settings"></section>
+</main>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="dialog">
+    <button class="round modal-close" id="close" type="button">×</button>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<script type="module" src="assets/app.js"></script>
+</body>
+</html>
