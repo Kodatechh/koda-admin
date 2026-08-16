@@ -49,6 +49,22 @@ function compareVersions(a, b) {
   return 0
 }
 
+function parseChangelogItems(value) {
+  const seen = new Set()
+  return String(value || '')
+    .split(/\r?\n/)
+    .map((item) => item.trim().replace(/^[-*•]\s*/, '').trim())
+    .filter(Boolean)
+    .map((item) => item.slice(0, 280))
+    .filter((item) => {
+      const key = item.toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    .slice(0, 30)
+}
+
 function formatBytes(bytes) {
   const size = Number(bytes) || 0
   if (size < 1024) return `${size} B`
@@ -141,7 +157,7 @@ async function loadOtaData() {
         .limit(500),
       supabase
         .from('koda_os_releases')
-        .select('id,version,target_model,channel,release_notes,storage_path,original_filename,sha256,file_size,status,created_by,published_by,created_at,published_at,updated_at')
+        .select('id,version,target_model,channel,release_notes,changelog_items,storage_path,original_filename,sha256,file_size,status,created_by,published_by,created_at,published_at,updated_at')
         .order('created_at', { ascending: false })
         .limit(100)
     ])
@@ -159,6 +175,7 @@ async function loadOtaData() {
 
 function releaseRow(release) {
   const eligible = eligibleDevices(release)
+  const changelogCount = Array.isArray(release.changelog_items) ? release.changelog_items.length : 0
   let action = '<span class="ota-muted">Somente leitura</span>'
 
   if (otaState.isAdmin && ['draft', 'paused'].includes(release.status)) {
@@ -173,7 +190,7 @@ function releaseRow(release) {
     <div class="ota-release-main">
       <div class="ota-release-title"><strong>KODA OS ${escapeHtml(release.version)}</strong><i class="pill ${releaseStatusClass(release.status)}">${escapeHtml(RELEASE_STATUSES[release.status] || release.status)}</i></div>
       <span>${escapeHtml(release.target_model)} · ${escapeHtml(release.channel)} · ${escapeHtml(formatBytes(release.file_size))}</span>
-      <small>${escapeHtml(release.original_filename)} · SHA-256 ${escapeHtml(String(release.sha256 || '').slice(0, 12))}…</small>
+      <small>${escapeHtml(release.original_filename)} · SHA-256 ${escapeHtml(String(release.sha256 || '').slice(0, 12))}… · ${changelogCount} item${changelogCount === 1 ? '' : 's'} no changelog</small>
     </div>
     <div class="ota-release-meta"><strong>${eligible.length}</strong><span>elegível${eligible.length === 1 ? '' : 'is'}</span></div>
     <div class="ota-release-meta"><strong>${escapeHtml(formatDate(release.published_at || release.created_at))}</strong><span>${release.published_at ? 'publicado' : 'enviado'}</span></div>
@@ -196,7 +213,7 @@ function renderPublisher() {
 
   const html = `<section class="ota-publisher" id="otaPublisher">
     <div class="ota-publisher-head">
-      <div><div class="eyebrow">DISTRIBUIÇÃO OTA · KODACLOUD</div><h2>Publicar atualização</h2><p>Envie um pacote do KODA OS, confira a compatibilidade e publique para os KodaBots elegíveis.</p></div>
+      <div><div class="eyebrow">DISTRIBUIÇÃO OTA · KODACLOUD</div><h2>Publicar atualização</h2><p>Envie um pacote do KODA OS, escreva o changelog público, confira a compatibilidade e publique para os KodaBots elegíveis.</p></div>
       ${action}
     </div>
     <div class="ota-summary">
@@ -204,7 +221,7 @@ function renderPublisher() {
       <article><span>Receberão a atualização</span><strong>${eligible}</strong><small>KodaBots com versão anterior e modelo compatível</small></article>
       <article><span>Rascunhos</span><strong>${drafts}</strong><small>Pacotes enviados, ainda não distribuídos</small></article>
     </div>
-    <div class="ota-flow-note"><strong>Como funciona</strong><span>Upload → validação SHA-256 → publicação → KodaBot consulta o KodaCloud → download autenticado → confirmação após instalação.</span></div>
+    <div class="ota-flow-note"><strong>Como funciona</strong><span>Upload → changelog → validação SHA-256 → publicação → site Koda atualizado → KodaBot consulta o KodaCloud → download autenticado → confirmação após instalação.</span></div>
     <div class="ota-release-list">
       ${otaState.releases.length ? otaState.releases.map(releaseRow).join('') : '<div class="ota-empty"><strong>Nenhuma atualização enviada ainda.</strong><span>O primeiro pacote aparecerá aqui depois do upload.</span></div>'}
     </div>
@@ -233,13 +250,17 @@ function openUploadModal() {
     <button class="ota-close" type="button" aria-label="Fechar">×</button>
     <div class="eyebrow">NOVA ATUALIZAÇÃO</div>
     <h3>Enviar pacote do KODA OS</h3>
-    <p>O pacote fica privado até você clicar em <strong>Publicar</strong>. Use um arquivo <strong>.zip</strong> com os arquivos da atualização.</p>
+    <p>O pacote fica privado até você clicar em <strong>Publicar</strong>. O changelog só aparece no site quando a versão for publicada.</p>
     <form id="otaUploadForm" class="ota-form">
       <div class="ota-form-grid">
         <label>Versão<input id="otaVersion" required placeholder="0.5.0" inputmode="decimal" /></label>
         <label>Modelo compatível<select id="otaModel" required>${options}</select></label>
       </div>
-      <label>Notas da atualização<textarea id="otaNotes" rows="4" placeholder="O que mudou nesta versão?"></textarea></label>
+      <label>Notas internas da atualização<textarea id="otaNotes" rows="3" placeholder="Observações internas sobre a versão (opcional)."></textarea></label>
+      <label>Changelog público
+        <textarea id="otaChangelog" rows="6" required placeholder="- Correção de bugs e melhorias&#10;- Wi‑Fi mais estável&#10;- Melhorias no painel de tarefas"></textarea>
+        <span class="ota-muted">Um item por linha. Você pode começar com -, • ou *; o site transforma em uma lista automaticamente.</span>
+      </label>
       <label class="ota-file-label">Pacote da atualização<input id="otaFile" type="file" accept=".zip,application/zip,application/x-zip-compressed" required /><span>ZIP · máximo de 25 MB</span></label>
       <div class="ota-upload-status" id="otaUploadStatus"></div>
       <button class="primary ota-submit" id="otaUploadSubmit" type="submit">Enviar como rascunho</button>
@@ -262,12 +283,17 @@ async function uploadRelease(event) {
   const version = $('otaVersion').value.trim().replace(/^v/i, '')
   const targetModel = $('otaModel').value.trim()
   const notes = $('otaNotes').value.trim()
+  const changelog = parseChangelogItems($('otaChangelog').value)
   const file = $('otaFile').files?.[0]
   const status = $('otaUploadStatus')
   const submit = $('otaUploadSubmit')
 
   if (!/^\d+(\.\d+){1,3}$/.test(version)) {
     status.textContent = 'Use uma versão numérica, por exemplo 0.5 ou 1.2.0.'
+    return
+  }
+  if (!changelog.length) {
+    status.textContent = 'Adicione pelo menos um item ao changelog público.'
     return
   }
   if (!file) {
@@ -310,6 +336,7 @@ async function uploadRelease(event) {
         target_model: targetModel,
         channel: 'stable',
         release_notes: notes || null,
+        changelog_items: changelog,
         storage_path: path,
         original_filename: file.name,
         sha256,
@@ -330,12 +357,12 @@ async function uploadRelease(event) {
       action: 'koda_os_release_uploaded',
       entity_type: 'koda_os_release',
       entity_id: release.id,
-      details: { version, target_model: targetModel, file_size: file.size, sha256 }
+      details: { version, target_model: targetModel, file_size: file.size, sha256, changelog_items: changelog.length }
     })
 
     $('otaUploadModal')?.remove()
     await refreshPublisher()
-    showNotice(`KODA OS ${version} enviado como rascunho. Revise e publique quando estiver pronto.`, 'success')
+    showNotice(`KODA OS ${version} enviado como rascunho com ${changelog.length} item${changelog.length === 1 ? '' : 's'} no changelog.`, 'success')
   } catch (error) {
     console.error('[Koda Admin OTA upload]', error)
     status.textContent = error?.message || 'Não foi possível enviar a atualização.'
@@ -347,9 +374,16 @@ async function publishRelease(releaseId) {
   const release = otaState.releases.find((item) => item.id === releaseId)
   if (!release || !otaState.isAdmin) return
   const eligible = eligibleDevices(release)
+  const changelogCount = Array.isArray(release.changelog_items) ? release.changelog_items.length : 0
+
+  if (!changelogCount) {
+    showNotice('Esta versão não possui changelog público. Envie novamente o pacote com pelo menos um item.', 'error')
+    return
+  }
+
   const message = eligible.length
-    ? `Publicar KODA OS ${release.version} para ${eligible.length} KodaBot${eligible.length === 1 ? '' : 's'} elegível${eligible.length === 1 ? '' : 'is'}?`
-    : `Publicar KODA OS ${release.version}? Nenhum KodaBot precisa desta versão neste momento.`
+    ? `Publicar KODA OS ${release.version} para ${eligible.length} KodaBot${eligible.length === 1 ? '' : 's'} elegível${eligible.length === 1 ? '' : 'is'} e liberar ${changelogCount} item${changelogCount === 1 ? '' : 's'} no site Koda?`
+    : `Publicar KODA OS ${release.version} e liberar ${changelogCount} item${changelogCount === 1 ? '' : 's'} no site Koda? Nenhum KodaBot precisa desta versão neste momento.`
   if (!window.confirm(message)) return
 
   try {
@@ -386,12 +420,12 @@ async function publishRelease(releaseId) {
       action: 'koda_os_release_published',
       entity_type: 'koda_os_release',
       entity_id: release.id,
-      details: { version: release.version, target_model: release.target_model, eligible_devices: eligible.length }
+      details: { version: release.version, target_model: release.target_model, eligible_devices: eligible.length, changelog_items: changelogCount }
     })
 
     await refreshPublisher()
     $('refreshData')?.click()
-    showNotice(`KODA OS ${release.version} publicado. O KodaCloud já pode entregá-lo aos KodaBots elegíveis.`, 'success')
+    showNotice(`KODA OS ${release.version} publicado. O changelog já está disponível no site Koda.`, 'success')
   } catch (error) {
     console.error('[Koda Admin OTA publish]', error)
     showNotice(error?.message || 'Não foi possível publicar a atualização.', 'error')
