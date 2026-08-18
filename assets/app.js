@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3'
 const SUPABASE_URL = 'https://qqvwnsemihkknzodkxob.supabase.co'
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_zrtmwfwuVzwsuMwCvyAMlg_TAP2tgNS'
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY)
+const DEVICE_ONLINE_WINDOW_MS = 120_000
 
 const STAFF_ROLES = new Set(['admin', 'support_agent', 'support_advanced'])
 const SUPPORT_STATUSES = ['open', 'in_progress', 'waiting_customer', 'resolved', 'closed']
@@ -137,6 +138,16 @@ function healthMap() {
   return new Map(state.health.map((item) => [item.device_id, item]))
 }
 
+function isDeviceOnline(health, now = Date.now()) {
+  if (!health?.last_seen_at) return false
+  const lastSeen = Date.parse(health.last_seen_at)
+  return Number.isFinite(lastSeen) && now - lastSeen <= DEVICE_ONLINE_WINDOW_MS
+}
+
+function deviceLastSeen(device, health) {
+  return device?.last_seen_at || health?.last_seen_at || null
+}
+
 function versionParts(version) {
   return String(version || '').replace(/^v/i, '').split('.').map((part) => Number(part.replace(/\D.*/, '')) || 0)
 }
@@ -211,7 +222,7 @@ async function loadAllData({ quiet = false } = {}) {
   if (!quiet) $('refreshData').disabled = true
 
   const [devices, health, cases, orders, products, payments, profiles, audit] = await Promise.all([
-    query('devices', supabase.from('devices').select('id,serial_number,model,status,manufactured_at,kodaos_version,owner_user_id,activated_at,created_at,updated_at,hardware_revision,latest_available_kodaos,provisioning_status').order('created_at', { ascending: false }).limit(500)),
+    query('devices', supabase.from('devices').select('id,serial_number,model,status,manufactured_at,kodaos_version,owner_user_id,activated_at,created_at,updated_at,hardware_revision,latest_available_kodaos,provisioning_status,last_seen_at').order('created_at', { ascending: false }).limit(500)),
     query('device_health', supabase.from('device_health').select('device_id,online,last_seen_at,wifi_status,wifi_signal,system_status,display_status,touch_status,sensor_status,audio_status,storage_status,last_boot_at,last_restart_reason,updated_at').limit(500)),
     query('support_cases', supabase.from('support_cases').select('id,owner_user_id,device_id,category,subject,message,status,created_at,updated_at').order('created_at', { ascending: false }).limit(300)),
     query('orders', supabase.from('orders').select('id,order_number,user_id,status,currency,total_cents,customer_name,customer_email,created_at,updated_at,paid_at,cancelled_at').order('created_at', { ascending: false }).limit(300)),
@@ -248,8 +259,8 @@ function greeting() {
 function dashboardHtml() {
   const hMap = healthMap()
   const total = state.devices.length
-  const online = state.devices.filter((d) => hMap.get(d.id)?.online === true).length
-  const offline = state.devices.filter((d) => hMap.has(d.id) && hMap.get(d.id)?.online === false).length
+  const online = state.devices.filter((d) => isDeviceOnline({ last_seen_at: deviceLastSeen(d, hMap.get(d.id)) })).length
+  const offline = state.devices.filter((d) => deviceLastSeen(d, hMap.get(d.id)) && !isDeviceOnline({ last_seen_at: deviceLastSeen(d, hMap.get(d.id)) })).length
   const noTelemetry = total - online - offline
   const awaitingActivation = state.devices.filter((d) => d.status === 'not_activated').length
   const activeCases = state.cases.filter((c) => ['open', 'in_progress', 'waiting_customer'].includes(c.status)).length
@@ -315,8 +326,10 @@ function renderDevices() {
   const hMap = healthMap()
   const rows = state.devices.map((device) => {
     const health = hMap.get(device.id)
-    const connection = health ? (health.online ? 'Online' : 'Offline') : 'Sem telemetria'
-    const status = device.status === 'not_activated' ? 'not_activated' : health?.online ? 'activated' : device.status
+    const lastSeen = deviceLastSeen(device, health)
+    const online = isDeviceOnline({ last_seen_at: lastSeen })
+    const connection = lastSeen ? (online ? 'Online' : 'Offline') : 'Sem telemetria'
+    const status = device.status === 'not_activated' ? 'not_activated' : online ? 'activated' : device.status
     return `<button class="trow rowbutton" data-device-id="${escapeHtml(device.id)}" type="button">
       <span><strong>${escapeHtml(device.serial_number)}</strong><small>${escapeHtml(emptyValue(device.hardware_revision, 'Revisão não informada'))}</small></span>
       <span>${escapeHtml(device.model)}</span>
@@ -341,8 +354,8 @@ function openDevice(deviceId) {
       <div><span>KODA OS</span><strong>${escapeHtml(emptyValue(device.kodaos_version))}</strong></div>
       <div><span>Atualização disponível</span><strong>${escapeHtml(emptyValue(device.latest_available_kodaos, 'Nenhuma informada'))}</strong></div>
       <div><span>Provisionamento</span><strong>${escapeHtml(statusLabel(device.provisioning_status))}</strong></div>
-      <div><span>Conexão</span><strong>${health ? (health.online ? 'Online' : 'Offline') : 'Sem telemetria'}</strong></div>
-      <div><span>Último contato</span><strong>${escapeHtml(health?.last_seen_at ? formatDate(health.last_seen_at) : 'Nunca reportado')}</strong></div>
+      <div><span>Conexão</span><strong>${deviceLastSeen(device, health) ? (isDeviceOnline({ last_seen_at: deviceLastSeen(device, health) }) ? 'Online' : 'Offline') : 'Sem telemetria'}</strong></div>
+      <div><span>Último contato</span><strong>${escapeHtml(deviceLastSeen(device, health) ? formatDate(deviceLastSeen(device, health)) : 'Nunca reportado')}</strong></div>
       <div><span>Wi‑Fi</span><strong>${escapeHtml(emptyValue(health?.wifi_status, 'Sem dados'))}${health?.wifi_signal != null ? ` · ${escapeHtml(health.wifi_signal)} dBm` : ''}</strong></div>
       <div><span>Sistema</span><strong>${escapeHtml(emptyValue(health?.system_status, 'Sem dados'))}</strong></div>
     </div>`, true)
