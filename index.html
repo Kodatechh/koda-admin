@@ -11,7 +11,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/styles.css" />
 <link rel="stylesheet" href="assets/ota.css" />
-<link rel="stylesheet" href="assets/products.css" />
+<link rel="stylesheet" href="assets/products.css?v=3" />
+<link rel="stylesheet" href="assets/factory.css?v=1" />
 </head>
 <body>
 <div class="auth-shell" id="authShell">
@@ -38,6 +39,7 @@
   <nav id="nav">
     <button class="navbtn active" data-page="dashboard"><span class="glyph">⌂</span><span>Visão geral</span></button>
     <button class="navbtn" data-page="devices"><span class="glyph">◫</span><span>Dispositivos</span></button>
+    <button class="navbtn" data-page="factory"><span class="glyph">⌂</span><span>Fábrica</span></button>
     <button class="navbtn" data-page="os"><span class="glyph">↻</span><span>KODA OS</span></button>
     <button class="navbtn" data-page="orders"><span class="glyph">▣</span><span>Pedidos</span></button>
     <button class="navbtn" data-page="customers"><span class="glyph">◎</span><span>Clientes</span></button>
@@ -66,6 +68,7 @@
 </header>
 <section class="page active" id="page-dashboard"><div class="loading-state">Carregando dados reais do KodaCloud…</div></section>
 <section class="page" id="page-devices"></section>
+<section class="page" id="page-factory"></section>
 <section class="page" id="page-os"></section>
 <section class="page" id="page-orders"></section>
 <section class="page" id="page-customers"></section>
@@ -86,6 +89,7 @@
 
 <script type="module" src="assets/app.js"></script>
 <script type="module" src="assets/ota.js"></script>
-<script type="module" src="assets/products-v2.js?v=2"></script>
+<script type="module" src="assets/products-v2.js?v=3"></script>
+<script type="module" src="assets/factory.js?v=1"></script>
 </body>
 </html>
