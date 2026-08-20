@@ -70,7 +70,7 @@ function cardHtml(order) {
 
 async function loadOperations() {
   const page = document.getElementById('page-orders')
-  if (!page || page.hidden || loading) return
+  if (!page || !page.classList.contains('active') || loading) return
   loading = true
   try {
     let root = document.getElementById('ordersOps')
@@ -129,17 +129,24 @@ function bindActions() {
   })
 }
 
-function scheduleLoad() {
+function scheduleLoad(delay = 120) {
   window.clearTimeout(rerenderTimer)
   rerenderTimer = window.setTimeout(() => {
     const page = document.getElementById('page-orders')
     if (page?.classList.contains('active')) loadOperations()
-  }, 120)
+  }, delay)
 }
 
-const observer = new MutationObserver(scheduleLoad)
+const observer = new MutationObserver((mutations) => {
+  const meaningful = mutations.some((mutation) => {
+    const target = mutation.target instanceof Element ? mutation.target : mutation.target.parentElement
+    return !target?.closest?.('#ordersOps')
+  })
+  if (meaningful) scheduleLoad()
+})
 observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'hidden'] })
 document.addEventListener('click', (event) => {
-  if (event.target.closest?.('[data-page="orders"]')) window.setTimeout(loadOperations, 160)
+  if (event.target.closest?.('[data-page="orders"]')) scheduleLoad(180)
+  if (event.target.closest?.('#refreshData')) scheduleLoad(900)
 })
-window.addEventListener('load', scheduleLoad)
+window.addEventListener('load', () => scheduleLoad(200))
